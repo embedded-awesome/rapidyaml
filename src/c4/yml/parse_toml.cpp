@@ -5,7 +5,6 @@
 #include <toml++/toml.hpp>
 
 #include <sstream>
-#include <fstream>
 #include <cmath>
 
 namespace c4 {
@@ -34,6 +33,38 @@ csubstr scalar_to_arena(Tree* tree, const T& value)
     ss << value;
     std::string str = ss.str();
     return to_arena(tree, str);
+}
+
+// Helper to handle TOML parse errors
+[[noreturn]] void handle_toml_parse_error(const toml::parse_error& err)
+{
+    std::ostringstream ss;
+    ss << err;
+    std::string msg = ss.str();
+    // Use the global callbacks error handler
+    Callbacks const& cb = get_callbacks();
+    ErrorDataBasic errdata = {};
+    cb.m_error_basic(csubstr(msg.c_str(), msg.size()), errdata, cb.m_user_data);
+    // This function should never return, but if the error handler somehow does, abort
+    std::abort();
+}
+
+// Helper to set a scalar value on a node
+void set_scalar_value(Tree* tree, id_type node_id, csubstr val, NodeType_e extra_flags = NOTYPE)
+{
+    if (tree->has_key(node_id))
+    {
+        csubstr key = tree->key(node_id);
+        tree->to_keyval(node_id, key, val);
+    }
+    else
+    {
+        tree->to_val(node_id, val);
+    }
+    if (extra_flags != NOTYPE)
+    {
+        tree->_add_flags(node_id, extra_flags);
+    }
 }
 
 // Convert any TOML value to tree nodes
@@ -82,32 +113,13 @@ void convert_toml_value(const toml::node& toml_node, Tree* tree, id_type node_id
     {
         std::string_view str_val = toml_node.as_string()->get();
         csubstr val = to_arena(tree, str_val);
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-            // Mark the value as double-quoted
-            tree->_add_flags(node_id, VAL_DQUO);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-            tree->_add_flags(node_id, VAL_DQUO);
-        }
+        set_scalar_value(tree, node_id, val, VAL_DQUO);
     }
     else if (toml_node.is_integer())
     {
         int64_t int_val = toml_node.as_integer()->get();
         csubstr val = scalar_to_arena(tree, int_val);
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-        }
+        set_scalar_value(tree, node_id, val);
     }
     else if (toml_node.is_floating_point())
     {
@@ -125,68 +137,28 @@ void convert_toml_value(const toml::node& toml_node, Tree* tree, id_type node_id
         {
             val = scalar_to_arena(tree, d);
         }
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-        }
+        set_scalar_value(tree, node_id, val);
     }
     else if (toml_node.is_boolean())
     {
         bool bool_val = toml_node.as_boolean()->get();
         csubstr val = bool_val ? to_arena(tree, "true") : to_arena(tree, "false");
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-        }
+        set_scalar_value(tree, node_id, val);
     }
     else if (toml_node.is_date())
     {
         csubstr val = scalar_to_arena(tree, toml_node.as_date()->get());
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-        }
+        set_scalar_value(tree, node_id, val);
     }
     else if (toml_node.is_time())
     {
         csubstr val = scalar_to_arena(tree, toml_node.as_time()->get());
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-        }
+        set_scalar_value(tree, node_id, val);
     }
     else if (toml_node.is_date_time())
     {
         csubstr val = scalar_to_arena(tree, toml_node.as_date_time()->get());
-        if (tree->has_key(node_id))
-        {
-            csubstr key = tree->key(node_id);
-            tree->to_keyval(node_id, key, val);
-        }
-        else
-        {
-            tree->to_val(node_id, val);
-        }
+        set_scalar_value(tree, node_id, val);
     }
 }
 
@@ -204,15 +176,7 @@ void parse_toml_impl(csubstr filename, csubstr toml, Tree* t, id_type node_id)
     }
     catch (const toml::parse_error& err)
     {
-        // Convert toml++ parse error to ryml error
-        std::ostringstream ss;
-        ss << err;
-        std::string msg = ss.str();
-        // Use the global callbacks error handler
-        Callbacks const& cb = get_callbacks();
-        ErrorDataBasic errdata = {};
-        cb.m_error_basic(csubstr(msg.c_str(), msg.size()), errdata, cb.m_user_data);
-        return; // This should not be reached if error handler throws/aborts
+        handle_toml_parse_error(err);
     }
 
     convert_toml_value(tbl, t, node_id);
@@ -229,15 +193,7 @@ void parse_toml_file_impl(csubstr filename, Tree* t, id_type node_id)
     }
     catch (const toml::parse_error& err)
     {
-        // Convert toml++ parse error to ryml error
-        std::ostringstream ss;
-        ss << err;
-        std::string msg = ss.str();
-        // Use the global callbacks error handler
-        Callbacks const& cb = get_callbacks();
-        ErrorDataBasic errdata = {};
-        cb.m_error_basic(csubstr(msg.c_str(), msg.size()), errdata, cb.m_user_data);
-        return; // This should not be reached if error handler throws/aborts
+        handle_toml_parse_error(err);
     }
 
     convert_toml_value(tbl, t, node_id);

@@ -1,10 +1,8 @@
 #ifndef RYML_SINGLE_HEADER
 #include "c4/yml/std/std.hpp"
 #include "c4/yml/parse_toml.hpp"
+#include "c4/yml/parse.hpp"
 #include "c4/yml/emit.hpp"
-#include <c4/format.hpp>
-#include <c4/yml/detail/checks.hpp>
-#include <c4/yml/detail/print.hpp>
 #endif
 
 #include "./test_lib/test_case.hpp"
@@ -298,6 +296,86 @@ count = 42
 
     EXPECT_EQ(t2["name"].val(), "test");
     EXPECT_EQ(t2["count"].val(), "42");
+}
+
+//-----------------------------------------------------------------------------
+// Test edge cases
+
+TEST(parse_toml, empty_document)
+{
+    csubstr toml = "";
+    Tree t = parse_toml_in_arena(toml);
+    // Empty TOML document should result in an empty map
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_EQ(t.rootref().num_children(), 0u);
+}
+
+TEST(parse_toml, whitespace_only)
+{
+    csubstr toml = "   \n\n   \n";
+    Tree t = parse_toml_in_arena(toml);
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_EQ(t.rootref().num_children(), 0u);
+}
+
+TEST(parse_toml, comments_only)
+{
+    csubstr toml = R"(
+# This is a comment
+# Another comment
+)";
+    Tree t = parse_toml_in_arena(toml);
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_EQ(t.rootref().num_children(), 0u);
+}
+
+TEST(parse_toml, mixed_comments_and_values)
+{
+    csubstr toml = R"(
+# This is a comment
+key = "value"
+# Another comment
+)";
+    Tree t = parse_toml_in_arena(toml);
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_EQ(t.rootref().num_children(), 1u);
+    EXPECT_EQ(t["key"].val(), "value");
+}
+
+TEST(parse_toml, empty_string_value)
+{
+    csubstr toml = R"(key = "")";
+    Tree t = parse_toml_in_arena(toml);
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_EQ(t["key"].val(), "");
+}
+
+TEST(parse_toml, empty_array)
+{
+    csubstr toml = R"(arr = [])";
+    Tree t = parse_toml_in_arena(toml);
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_TRUE(t["arr"].is_seq());
+    EXPECT_EQ(t["arr"].num_children(), 0u);
+}
+
+TEST(parse_toml, empty_inline_table)
+{
+    csubstr toml = R"(tbl = {})";
+    Tree t = parse_toml_in_arena(toml);
+    EXPECT_TRUE(t.rootref().is_map());
+    EXPECT_TRUE(t["tbl"].is_map());
+    EXPECT_EQ(t["tbl"].num_children(), 0u);
+}
+
+TEST(parse_toml, noderef_overload)
+{
+    csubstr toml = R"(key = "value")";
+    Tree t;
+    NodeRef root = t.rootref();
+    parse_toml_in_place(toml, root);
+    EXPECT_TRUE(root.is_map());
+    EXPECT_EQ(t["key"].val(), "value");
 }
 
 //-----------------------------------------------------------------------------

@@ -1,0 +1,5 @@
+# Hashes of file build rules.
+40f1fe6541ec9f18962581db466c66f1 CMakeFiles/ryml-clang-tidy
+99b6f478a18bcc713b0caf86a333cf54 CMakeFiles/ryml-uninstall
+8292b668ee36ac971ff4c0c86ad33353 subprojects/c4core/build/CMakeFiles/c4core-amalgamate
+450693d3943991be51c2983e7e3ec7c1 subprojects/c4core/build/CMakeFiles/c4core-clang-tidy
