@@ -109,6 +109,16 @@ ryml_add_test(merge)
 ryml_add_test(location)
 ryml_add_test(bom)
 ryml_add_test(escape_scalar)
+
+# TOML test (only when TOML support is enabled)
+if(RYML_WITH_TOML)
+    c4_add_executable(ryml-test-toml
+        SOURCES test_toml.cpp
+        LIBS ryml-_testlib ryml_toml gtest_main
+        FOLDER test)
+    c4_add_test(ryml-test-toml)
+endif()
+
 ryml_add_test_case_group(empty_file)
 ryml_add_test_case_group(doc)
 ryml_add_test_case_group(seq)

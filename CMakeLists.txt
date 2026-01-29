@@ -22,6 +22,7 @@ option(RYML_SHORT_ERR_MSG "Use shorter error message from checks/asserts: do not
 option(RYML_BUILD_TOOLS "Build tools" OFF)
 option(RYML_BUILD_API "Enable API generation (python, etc)" OFF)
 option(RYML_DBG "Enable (very verbose) debug prints." OFF)
+option(RYML_WITH_TOML "Enable TOML parsing support (requires C++17 and toml++)" OFF)
 
 option(RYML_INSTALL "Enable install target" ON)
 
@@ -114,6 +115,47 @@ if(CMAKE_COMPILER_IS_GNUCXX)
     option(RYML_FANALYZER "Compile with -fanalyzer https://gcc.gnu.org/onlinedocs/gcc-13.2.0/gcc/Static-Analyzer-Options.html" OFF)
     if(RYML_FANALYZER)
         target_compile_options(ryml PUBLIC -fanalyzer)
+    endif()
+endif()
+
+
+#-------------------------------------------------------
+# TOML support (optional)
+
+if(RYML_WITH_TOML)
+    include(FetchContent)
+    FetchContent_Declare(
+        tomlplusplus
+        GIT_REPOSITORY https://github.com/marzer/tomlplusplus.git
+        GIT_TAG        v3.4.0
+    )
+    FetchContent_MakeAvailable(tomlplusplus)
+
+    # Create the ryml_toml library using regular CMake commands
+    # to avoid export set issues with tomlplusplus
+    add_library(ryml_toml
+        ${RYML_SRC_DIR}/c4/yml/parse_toml.hpp
+        ${RYML_SRC_DIR}/c4/yml/parse_toml.cpp
+    )
+    target_include_directories(ryml_toml PUBLIC
+        $<BUILD_INTERFACE:${RYML_SRC_DIR}>
+        $<INSTALL_INTERFACE:include>
+    )
+    target_link_libraries(ryml_toml PUBLIC ryml tomlplusplus::tomlplusplus)
+    target_compile_features(ryml_toml PUBLIC cxx_std_17)
+    set_target_properties(ryml_toml PROPERTIES
+        FOLDER ryml
+    )
+
+    if(RYML_INSTALL)
+        install(TARGETS ryml_toml
+            RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+            LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+            ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+        )
+        install(FILES ${RYML_SRC_DIR}/c4/yml/parse_toml.hpp
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/c4/yml
+        )
     endif()
 endif()
 
