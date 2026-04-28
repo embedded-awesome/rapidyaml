@@ -202,6 +202,23 @@ public:
     template<class U=Impl>
     C4_ALWAYS_INLINE auto get() RYML_NOEXCEPT -> _C4_IF_MUTABLE(NodeData*) { return ((Impl const*)this)->readable() ? tree__->get(id__) : nullptr; }
 
+    /** returns the value as type T or nullopt if the node is not readable or the conversion fails */
+    template<typename T>
+    C4_ALWAYS_INLINE C4_PURE std::optional<T> val() const noexcept
+    {
+        RYML_ASSERT(tree_ != nullptr);
+        const auto n = tree_->get(id_);
+        T result{};
+        if(!n) return std::nullopt;
+
+        // Cast CRTP base to actual node type so read() overloads match.
+        Impl const& self = *static_cast<Impl const*>(this);
+        if(read(self, &result))
+            return result;
+
+        return std::nullopt;
+    }
+
     C4_ALWAYS_INLINE NodeType    type()     const RYML_NOEXCEPT { _C4RR(); return tree_->type(id_); }     /**< Forward to @ref Tree::type(). Node must be readable. */
     C4_ALWAYS_INLINE const char* type_str() const RYML_NOEXCEPT { _C4RR(); return tree_->type_str(id_); } /**< Forward to @ref Tree::type_str(). Node must be readable. */
 
