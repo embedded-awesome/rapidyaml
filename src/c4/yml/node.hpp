@@ -6,6 +6,7 @@
 #include <cstddef>
 
 #include "c4/yml/tree.hpp"
+#include "c4/yml/pointer.hpp"
 #include "c4/base64.hpp"
 
 #ifdef __clang__
@@ -329,6 +330,22 @@ public:
     C4_ALWAYS_INLINE bool has_child(id_type node) const RYML_NOEXCEPT { _C4RR(); return tree_->has_child(id_, node); } /**< Forward to @ref Tree::has_child(). Node must be readable. */
     C4_ALWAYS_INLINE bool has_child(csubstr name) const RYML_NOEXCEPT { _C4RR(); return tree_->has_child(id_, name); } /**< Forward to @ref Tree::has_child(). Node must be readable. */
     C4_ALWAYS_INLINE bool has_children() const RYML_NOEXCEPT { _C4RR(); return tree_->has_children(id_); } /**< Forward to @ref Tree::has_children(). Node must be readable. */
+
+    /** Wrapper for has_child() with std::map-like naming convention */
+    C4_ALWAYS_INLINE C4_PURE bool contains(csubstr name) const noexcept { _C4RV(); return tree_->has_child(id_, name); }
+    C4_ALWAYS_INLINE C4_PURE bool contains(Pointer ptr) const noexcept
+    {
+        _C4RV();
+        ConstImpl curr = *((ConstImpl const*)this);
+        for(size_t i = 0; i < ptr.size(); ++i)
+        {
+            if (curr.is_map() && curr.contains(ptr[i]))
+                curr = curr.find_child(ptr[i]);
+            else
+                return false;
+        }
+        return true;
+    }
 
     C4_ALWAYS_INLINE bool has_sibling(ConstImpl const& n) const RYML_NOEXCEPT { _C4RR(); return n.readable() ? tree_->has_sibling(id_, n.m_id) : false; } /**< Forward to @ref Tree::has_sibling(). Node must be readable. */
     C4_ALWAYS_INLINE bool has_sibling(id_type node) const RYML_NOEXCEPT { _C4RR(); return tree_->has_sibling(id_, node); } /**< Forward to @ref Tree::has_sibling(). Node must be readable. */
