@@ -332,10 +332,10 @@ public:
     C4_ALWAYS_INLINE bool has_children() const RYML_NOEXCEPT { _C4RR(); return tree_->has_children(id_); } /**< Forward to @ref Tree::has_children(). Node must be readable. */
 
     /** Wrapper for has_child() with std::map-like naming convention */
-    C4_ALWAYS_INLINE C4_PURE bool contains(csubstr name) const noexcept { _C4RV(); return tree_->has_child(id_, name); }
+    C4_ALWAYS_INLINE C4_PURE bool contains(csubstr name) const noexcept { _C4RR(); return tree_->has_child(id_, name); }
     C4_ALWAYS_INLINE C4_PURE bool contains(Pointer ptr) const noexcept
     {
-        _C4RV();
+        _C4RR();
         ConstImpl curr = *((ConstImpl const*)this);
         for(size_t i = 0; i < ptr.size(); ++i)
         {
