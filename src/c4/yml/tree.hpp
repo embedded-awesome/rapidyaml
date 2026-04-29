@@ -1303,7 +1303,14 @@ public:
     }
 
     /** Like _copy_props_wo_key() with a type-bit mask, but copies strings
-     * into this tree's arena so the result is independent of @p that_tree. */
+     * into this tree's arena so the result is independent of @p that_tree.
+     *
+     * The type is computed as:
+     *   - Take src type bits that are NOT part of the key mask, OR any
+     *     bits in src_mask; clear the rest from src.
+     *   - Preserve dst type bits that ARE part of the key mask, OR any
+     *     bits NOT in src_mask.
+     * This mirrors the logic in the plain _copy_props_wo_key overload. */
     void _copy_props_wo_key_with_arena(id_type dst_, Tree const* that_tree, id_type src_, type_bits src_mask)
     {
         NodeData      & C4_RESTRICT dst = *_p(dst_);

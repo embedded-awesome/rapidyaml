@@ -1194,7 +1194,11 @@ void Tree::merge_with_copy(Tree const *src, id_type src_node, id_type dst_node)
 
     if(src->has_val(src_node))
     {
-        type_bits mask_src = ~STYLE; // keep the existing style if it is already a val
+        // mask_src: the type bits that will be taken from src.
+        // Start by excluding all STYLE bits (preserving dst style when dst
+        // already has a val), then selectively add VAL_STYLE back if dst
+        // does not yet have a val (i.e. inherit the src val style).
+        type_bits mask_src = ~STYLE; // exclude style bits by default
         if( ! has_val(dst_node))
         {
             if(has_children(dst_node))
