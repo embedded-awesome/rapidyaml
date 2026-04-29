@@ -4,6 +4,7 @@
 /** @file node.hpp Node classes */
 
 #include <cstddef>
+#include <optional>
 
 #include "c4/yml/tree.hpp"
 #include "c4/yml/pointer.hpp"
@@ -1608,6 +1609,29 @@ public:
         {
             parent.m_tree->duplicate_children(m_tree, m_id, parent.m_id, after.m_id);
         }
+    }
+
+    /** Merge the content of the @p src node into this node.
+     *
+     * All string scalars (key, value, tag, anchor) are copied into
+     * this node's tree arena, so @p src may safely belong to a
+     * different tree whose lifetime does not extend beyond this call.
+     *
+     * Semantics are identical to @ref Tree::merge_with_copy(): for
+     * maps, existing keys in this node are overwritten and new ones
+     * are appended; for sequences, all elements from @p src are
+     * appended; for scalar nodes, the value is replaced.
+     *
+     * Merging a node with itself is a no-op.
+     *
+     * @pre This node must be readable (not a seed). */
+    void merge(ConstNodeRef const& src)
+    {
+        _C4RR();
+        _RYML_ASSERT_BASIC(src.readable());
+        if(m_tree == src.m_tree && m_id == src.m_id)
+            return; // self-merge: no-op
+        m_tree->merge_with_copy(src.m_tree, src.m_id, m_id);
     }
 
     /** @} */

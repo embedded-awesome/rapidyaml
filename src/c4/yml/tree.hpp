@@ -817,6 +817,12 @@ public:
 
     void merge_with(Tree const* src, id_type src_node=NONE, id_type dst_root=NONE);
 
+    /** Merge a source tree node into a destination node, copying all
+     * string data (keys, values, tags, anchors) into this tree's
+     * arena.  Safe to call when @p src is a different tree whose
+     * lifetime may end before this tree's. */
+    void merge_with_copy(Tree const* src, id_type src_node=NONE, id_type dst_root=NONE);
+
     /** @} */
 
 public:
@@ -1244,6 +1250,83 @@ public:
         auto const& C4_RESTRICT src = *that_tree->_p(src_);
         dst.m_type = (src.m_type & ((~_KEYMASK)|src_mask)) | (dst.m_type & (_KEYMASK|~src_mask));
         dst.m_val  = src.m_val;
+    }
+
+    /** Copy a scalar string @p s into this tree's arena if it is not
+     * already stored there; otherwise return @p s unchanged. */
+    csubstr _maybe_copy_scalar_to_arena(csubstr s)
+    {
+        if(s.empty() || in_arena(s))
+            return s;
+        return copy_to_arena(s);
+    }
+
+    /** Like _copy_props() but copies key/val/tag/anchor strings into
+     * this tree's arena so the result is independent of @p that_tree. */
+    void _copy_props_with_arena(id_type dst_, Tree const* that_tree, id_type src_)
+    {
+        NodeData      & C4_RESTRICT dst = *_p(dst_);
+        NodeData const& C4_RESTRICT src = *that_tree->_p(src_);
+        dst.m_type       = src.m_type;
+        dst.m_key.tag    = _maybe_copy_scalar_to_arena(src.m_key.tag);
+        dst.m_key.scalar = _maybe_copy_scalar_to_arena(src.m_key.scalar);
+        dst.m_key.anchor = _maybe_copy_scalar_to_arena(src.m_key.anchor);
+        dst.m_val.tag    = _maybe_copy_scalar_to_arena(src.m_val.tag);
+        dst.m_val.scalar = _maybe_copy_scalar_to_arena(src.m_val.scalar);
+        dst.m_val.anchor = _maybe_copy_scalar_to_arena(src.m_val.anchor);
+    }
+
+    /** Like _copy_props_with_arena() but applies a type-bit mask. */
+    void _copy_props_with_arena(id_type dst_, Tree const* that_tree, id_type src_, type_bits src_mask)
+    {
+        NodeData      & C4_RESTRICT dst = *_p(dst_);
+        NodeData const& C4_RESTRICT src = *that_tree->_p(src_);
+        dst.m_type       = (src.m_type & src_mask) | (dst.m_type & ~src_mask);
+        dst.m_key.tag    = _maybe_copy_scalar_to_arena(src.m_key.tag);
+        dst.m_key.scalar = _maybe_copy_scalar_to_arena(src.m_key.scalar);
+        dst.m_key.anchor = _maybe_copy_scalar_to_arena(src.m_key.anchor);
+        dst.m_val.tag    = _maybe_copy_scalar_to_arena(src.m_val.tag);
+        dst.m_val.scalar = _maybe_copy_scalar_to_arena(src.m_val.scalar);
+        dst.m_val.anchor = _maybe_copy_scalar_to_arena(src.m_val.anchor);
+    }
+
+    /** Like _copy_props_wo_key() but copies val/tag/anchor strings into
+     * this tree's arena so the result is independent of @p that_tree. */
+    void _copy_props_wo_key_with_arena(id_type dst_, Tree const* that_tree, id_type src_)
+    {
+        NodeData      & C4_RESTRICT dst = *_p(dst_);
+        NodeData const& C4_RESTRICT src = *that_tree->_p(src_);
+        dst.m_type       = (src.m_type & ~_KEYMASK) | (dst.m_type & _KEYMASK);
+        dst.m_val.tag    = _maybe_copy_scalar_to_arena(src.m_val.tag);
+        dst.m_val.scalar = _maybe_copy_scalar_to_arena(src.m_val.scalar);
+        dst.m_val.anchor = _maybe_copy_scalar_to_arena(src.m_val.anchor);
+    }
+
+    /** Like _copy_props_wo_key() with a type-bit mask, but copies strings
+     * into this tree's arena so the result is independent of @p that_tree. */
+    void _copy_props_wo_key_with_arena(id_type dst_, Tree const* that_tree, id_type src_, type_bits src_mask)
+    {
+        NodeData      & C4_RESTRICT dst = *_p(dst_);
+        NodeData const& C4_RESTRICT src = *that_tree->_p(src_);
+        dst.m_type       = (src.m_type & ((~_KEYMASK)|src_mask)) | (dst.m_type & (_KEYMASK|~src_mask));
+        dst.m_val.tag    = _maybe_copy_scalar_to_arena(src.m_val.tag);
+        dst.m_val.scalar = _maybe_copy_scalar_to_arena(src.m_val.scalar);
+        dst.m_val.anchor = _maybe_copy_scalar_to_arena(src.m_val.anchor);
+    }
+
+    /** Recursively sum the byte-length of all string scalars (key,
+     * val, tag, anchor) in the subtree rooted at @p node in
+     * @p that_tree.  Used to pre-reserve arena space before a
+     * merge_with_copy() so that arena reallocations (which are O(N))
+     * are avoided. */
+    static size_t _subtree_string_size(Tree const* that_tree, id_type node)
+    {
+        NodeData const& C4_RESTRICT nd = *that_tree->_p(node);
+        size_t sz = nd.m_key.tag.len + nd.m_key.scalar.len + nd.m_key.anchor.len
+                  + nd.m_val.tag.len + nd.m_val.scalar.len + nd.m_val.anchor.len;
+        for(id_type ch = that_tree->first_child(node); ch != NONE; ch = that_tree->next_sibling(ch))
+            sz += _subtree_string_size(that_tree, ch);
+        return sz;
     }
 
     void _clear_type(id_type node)

@@ -1177,6 +1177,90 @@ void Tree::merge_with(Tree const *src, id_type src_node, id_type dst_node)
 
 //-----------------------------------------------------------------------------
 
+void Tree::merge_with_copy(Tree const *src, id_type src_node, id_type dst_node)
+{
+    _RYML_ASSERT_VISIT_(m_callbacks, src != nullptr, src, src_node);
+    if(src_node == NONE)
+        src_node = src->root_id();
+    if(dst_node == NONE)
+        dst_node = root_id();
+    _RYML_ASSERT_VISIT_(m_callbacks, src->has_val(src_node) || src->is_seq(src_node) || src->is_map(src_node), src, src_node);
+
+    // Pre-reserve enough arena space to hold all string data from the
+    // source subtree, avoiding repeated O(N) arena relocations.
+    size_t needed = _subtree_string_size(src, src_node);
+    if(needed > arena_slack())
+        _grow_arena(needed - arena_slack());
+
+    if(src->has_val(src_node))
+    {
+        type_bits mask_src = ~STYLE; // keep the existing style if it is already a val
+        if( ! has_val(dst_node))
+        {
+            if(has_children(dst_node))
+                remove_children(dst_node);
+            mask_src |= VAL_STYLE; // copy the src style
+        }
+        if(src->is_keyval(src_node))
+        {
+            _copy_props_with_arena(dst_node, src, src_node, mask_src);
+        }
+        else
+        {
+            _RYML_ASSERT_VISIT_(m_callbacks, src->is_val(src_node), src, src_node);
+            _copy_props_wo_key_with_arena(dst_node, src, src_node, mask_src);
+        }
+    }
+    else if(src->is_seq(src_node))
+    {
+        if( ! is_seq(dst_node))
+        {
+            if(has_children(dst_node))
+                remove_children(dst_node);
+            _clear_type(dst_node);
+            if(src->has_key(src_node))
+                to_seq(dst_node, _maybe_copy_scalar_to_arena(src->key(src_node)));
+            else
+                to_seq(dst_node);
+            _p(dst_node)->m_type = src->_p(src_node)->m_type;
+        }
+        for(id_type sch = src->first_child(src_node); sch != NONE; sch = src->next_sibling(sch))
+        {
+            id_type dch = append_child(dst_node);
+            _copy_props_wo_key_with_arena(dch, src, sch);
+            merge_with_copy(src, sch, dch);
+        }
+    }
+    else
+    {
+        _RYML_ASSERT_VISIT_(m_callbacks, src->is_map(src_node), src, src_node);
+        if( ! is_map(dst_node))
+        {
+            if(has_children(dst_node))
+                remove_children(dst_node);
+            _clear_type(dst_node);
+            if(src->has_key(src_node))
+                to_map(dst_node, _maybe_copy_scalar_to_arena(src->key(src_node)));
+            else
+                to_map(dst_node);
+            _p(dst_node)->m_type = src->_p(src_node)->m_type;
+        }
+        for(id_type sch = src->first_child(src_node); sch != NONE; sch = src->next_sibling(sch))
+        {
+            id_type dch = find_child(dst_node, src->key(sch));
+            if(dch == NONE)
+            {
+                dch = append_child(dst_node);
+                _copy_props_with_arena(dch, src, sch);
+            }
+            merge_with_copy(src, sch, dch);
+        }
+    }
+}
+
+
+//-----------------------------------------------------------------------------
+
 void Tree::resolve(bool clear_anchors)
 {
     if(m_size == 0)
